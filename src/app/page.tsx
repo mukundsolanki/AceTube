@@ -17,6 +17,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import toast, { Toaster } from "react-hot-toast";
+import { Loader2, ChevronRight } from "lucide-react";
+import { FaGithub } from "react-icons/fa";
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -25,12 +28,12 @@ export default function Home() {
     thumbnail: string;
   } | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [quality, setQuality] = useState("720p");
+  const [quality, setQuality] = useState("720");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: { preventDefault: () => void }) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setErrorMessage("");
+    setIsLoading(true);
 
     try {
       const response = await fetch("http://localhost:5000/api/get-info", {
@@ -47,55 +50,72 @@ export default function Home() {
         setVideoInfo(data);
         setIsDialogOpen(true);
       } else {
-        setErrorMessage(data.error || "Something went wrong");
+        toast.error(data.error || "Failed to fetch video information");
       }
     } catch (error) {
-      setErrorMessage("Failed to fetch video information");
+      toast.error("Failed to fetch video information");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleDownload = async () => {
+    if (!videoInfo) return;
+
     const downloadId = uuidv4();
+    setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:5000/api/download-video", {
+      const response = await fetch("http://localhost:5000/api/download", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          url,
-          quality,
-        }),
+        body: JSON.stringify({ url, quality, downloadId }),
       });
 
       if (response.ok) {
         const blob = await response.blob();
         const downloadUrl = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
+        a.style.display = "none";
         a.href = downloadUrl;
         a.download = `${downloadId}.mp4`;
         document.body.appendChild(a);
         a.click();
-        a.remove();
+        window.URL.revokeObjectURL(downloadUrl);
+
+        toast.success("Video downloaded successfully!");
       } else {
         const data = await response.json();
-        setErrorMessage(data.error || "Failed to start download");
+        toast.error(data.error || "Failed to download video");
       }
     } catch (error) {
-      setErrorMessage("Failed to download video");
+      toast.error("Failed to download video");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <>
+      <Toaster />
+      <div className="relative z-50">
+        <a
+          href="https://github.com/mukundsolanki/AceTube"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="absolute top-4 right-4 text-gray-700 hover:text-gray-900"
+        >
+          <FaGithub className="h-6 w-6" />
+        </a>
+      </div>
       <BackgroundLines className="flex items-center justify-center w-full flex-col px-4">
         <h2 className="bg-clip-text text-transparent text-center bg-gradient-to-b from-neutral-900 to-neutral-700 dark:from-neutral-600 dark:to-white text-2xl md:text-4xl lg:text-7xl font-sans py-2 md:py-10 relative z-20 font-bold tracking-tight">
-          Download Youtube, <br /> Videos Fast.
+          Download Videos, <br /> With AceTube.
         </h2>
         <p className="max-w-xl mx-auto text-sm md:text-lg text-neutral-700 dark:text-neutral-400 text-center mb-6">
-          Download youtube videos in mp4 format for free. Just paste the youtube
-          video URL in the input box and click on the download button.
+          Get videos in mp4 format for free.
         </p>
 
         <form
@@ -109,10 +129,16 @@ export default function Home() {
             onChange={(e) => setUrl(e.target.value)}
             required
           />
-          <Button type="submit">Start</Button>
+          {isLoading ? (
+            <div className="flex items-center justify-center">
+              <Loader2 className="animate-spin mr-2" />
+            </div>
+          ) : (
+            <Button type="submit" variant="outline" size="icon">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          )}
         </form>
-
-        {errorMessage && <p className="text-red-500 mt-4">{errorMessage}</p>}
       </BackgroundLines>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -140,16 +166,22 @@ export default function Home() {
                     <SelectValue placeholder="Select Quality" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1080p">1080p</SelectItem>
-                    <SelectItem value="720p">720p</SelectItem>
-                    <SelectItem value="480p">480p</SelectItem>
-                    <SelectItem value="360p">360p</SelectItem>
-                    <SelectItem value="240p">240p</SelectItem>
+                    <SelectItem value="1080">1080p</SelectItem>
+                    <SelectItem value="720">720p</SelectItem>
+                    <SelectItem value="480">480p</SelectItem>
+                    <SelectItem value="360">360p</SelectItem>
+                    <SelectItem value="240">240p</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <Button onClick={handleDownload}>Download</Button>
+              {isLoading ? (
+                <div className="flex items-center justify-center">
+                  <Loader2 className="animate-spin mr-2" />
+                </div>
+              ) : (
+                <Button onClick={handleDownload}>Download</Button>
+              )}
             </>
           )}
         </DialogContent>
