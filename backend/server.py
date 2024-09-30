@@ -10,7 +10,7 @@ import time
 app = Flask(__name__)
 
 # Configure CORS for all origins
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
