@@ -4,11 +4,13 @@ import yt_dlp
 import os
 import traceback
 import logging
+import threading
+import time
 
 app = Flask(__name__)
 
-# Configure CORS
-CORS(app, resources={r"/api/*": {"origins": "http://localhost:3000"}})
+# Configure CORS for all origins
+CORS(app)
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -77,11 +79,17 @@ def download_video():
                     os.rename(filename, new_filename)
                     filename = new_filename
 
-                return send_file(
+                # Send the file to the client
+                response = send_file(
                     filename, 
                     as_attachment=True, 
                     download_name=f"{downloadId}.mp4"
                 )
+
+                # Start a new thread to delete the file after a delay
+                threading.Thread(target=delete_file_after_delay, args=(filename,)).start()
+
+                return response
             else:
                 return jsonify({"error": f"No format available for quality {requested_quality}p"}), 404
 
@@ -90,6 +98,15 @@ def download_video():
         app.logger.error(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
+def delete_file_after_delay(filename, delay=5):
+    """Delete the specified file after a delay."""
+    time.sleep(delay)
+    try:
+        os.remove(filename)
+        app.logger.info(f"Deleted file: {filename}")
+    except Exception as e:
+        app.logger.error(f"Error deleting file {filename}: {str(e)}")
+
 @app.after_request
 def after_request(response):
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
@@ -97,4 +114,5 @@ def after_request(response):
     return response
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Run the app on all available IPs and port 5000 (default)
+    app.run(host='0.0.0.0', port=5000, debug=True)
